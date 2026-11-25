@@ -5,6 +5,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	_ "embed"
+	"sort"
 	"strings"
 	"crypto/rand"
 	"encoding/hex"
@@ -55,7 +56,9 @@ type Order struct {
 	ID, UserID, Item string
 	Amount           int
 	Paid             bool
+	At               int64
 }
+type Live struct{ ID, Title, At, Link string }
 type Cert struct{ ID, UserName, CourseTitle, Date string }
 type DB struct {
 	Users    map[string]*User
@@ -67,6 +70,7 @@ type DB struct {
 	Quizzes  map[string][]Q
 	Certs    map[string]Cert
 	Orders   map[string]*Order
+	Lives    []Live
 	Settings map[string]string // smtp_host,smtp_port,smtp_user,smtp_pass,wa_url,wa_token
 }
 
@@ -124,7 +128,7 @@ func guard(admin bool, f func(http.ResponseWriter, *http.Request, *User)) http.H
 			return
 		}
 		u := me(r)
-		if !admin && u == nil && r.URL.Path != "/api/courses" && r.URL.Path != "/api/combos" && r.URL.Path != "/api/reviews" && r.URL.Path != "/api/auth/otp/send" && r.URL.Path != "/api/auth/otp/verify" && r.URL.Path != "/api/auth/google" {
+		if !admin && u == nil && r.URL.Path != "/api/courses" && r.URL.Path != "/api/combos" && r.URL.Path != "/api/live" && r.URL.Path != "/api/reviews" && r.URL.Path != "/api/auth/otp/send" && r.URL.Path != "/api/auth/otp/verify" && r.URL.Path != "/api/auth/google" {
 			http.Error(w, `{"error":"login required"}`, 401)
 			return
 		}
@@ -399,7 +403,7 @@ func main() {
 			http.Error(w, `{"error":"razorpay order failed - check keys"}`, 502)
 			return
 		}
-		db.Orders[o.ID] = &Order{o.ID, u.ID, b.ItemID, amt, false}
+		db.Orders[o.ID] = &Order{o.ID, u.ID, b.ItemID, amt, false, time.Now().Unix()}
 		sch := "https"
 		if strings.HasPrefix(r.Host, "localhost") {
 			sch = "http"
@@ -446,6 +450,64 @@ func main() {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(adminHTML)
 	})
+	m.HandleFunc("GET /api/live", guard(false, func(w http.ResponseWriter, r *http.Request, _ *User) { jw(w, db.Lives) }))
+	m.HandleFunc("POST /api/admin/live", guard(true, func(w http.ResponseWriter, r *http.Request, _ *User) {
+		var l Live
+		in(r, &l)
+		l.ID = rid()
+		db.Lives = append(db.Lives, l)
+		jw(w, l)
+	}))
+	m.HandleFunc("POST /api/admin/live/{id}/delete", guard(true, func(w http.ResponseWriter, r *http.Request, _ *User) {
+		for i, l := range db.Lives {
+			if l.ID == r.PathValue("id") {
+				db.Lives = append(db.Lives[:i], db.Lives[i+1:]...)
+				break
+			}
+		}
+		jw(w, "ok")
+	}))
+	m.HandleFunc("GET /api/admin/stats", guard(true, func(w http.ResponseWriter, r *http.Request, _ *User) {
+		rev, paid, pend := 0, 0, 0
+		days, top, names := map[string]int{}, map[string]int{}, map[string]string{}
+		for _, c := range db.Courses {
+			names[c.ID] = c.Title
+		}
+		for _, c := range db.Combos {
+			names[c.ID] = c.Title
+		}
+		for _, o := range db.Orders {
+			if o.Paid {
+				rev += o.Amount
+				paid++
+				days[time.Unix(o.At, 0).Format("02 Jan")] += o.Amount
+				top[o.Item]++
+			} else {
+				pend++
+			}
+		}
+		labels, vals := []string{}, []int{}
+		for i := 13; i >= 0; i-- {
+			d := time.Now().AddDate(0, 0, -i).Format("02 Jan")
+			labels, vals = append(labels, d), append(vals, days[d])
+		}
+		type T struct {
+			Title string
+			Sales int
+		}
+		tops := []T{}
+		for id, n := range top {
+			tops = append(tops, T{names[id], n})
+		}
+		sort.Slice(tops, func(a, b int) bool { return tops[a].Sales > tops[b].Sales })
+		rp := 0
+		for _, v := range db.Reviews {
+			if !v.Approved {
+				rp++
+			}
+		}
+		jw(w, map[string]any{"revenue": rev, "orders": paid, "customers": len(db.Users), "pending": pend, "labels": labels, "values": vals, "top": tops, "reviewsPending": rp})
+	}))
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
