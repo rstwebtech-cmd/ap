@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
-	_ "embed"
+	"embed"
 	"sort"
 	"strings"
 	"crypto/rand"
@@ -26,7 +26,7 @@ type User struct {
 	Courses                []string
 }
 type Course struct {
-	ID, Title, Category, Duration string
+	ID, Title, Category, Duration, Image string
 	Price, MRP                    int
 	OfferLabel                    string // e.g. "Diwali Sale"
 	OfferEnds                     string // RFC3339, app shows countdown
@@ -81,6 +81,9 @@ var (
 	otps     = map[string]string{}
 )
 
+//go:embed static
+var staticFS embed.FS
+
 //go:embed admin.html
 var adminHTML []byte
 
@@ -91,20 +94,29 @@ func load() {
 		return
 	}
 	for i, c := range []Course{
-		{Title: "Basic English Language Course", Category: "English", Duration: "941m", Price: 2859, MRP: 3999},
-		{Title: "Advance English Course", Category: "English", Duration: "472m", Price: 3449, MRP: 4499},
-		{Title: "British Accent Course", Category: "Accent", Duration: "241m", Price: 4039, MRP: 8999},
-		{Title: "American Accent Spoken Course", Category: "Accent", Duration: "332m", Price: 4039, MRP: 6999},
-		{Title: "IELTS Full Course", Category: "Language", Duration: "335m", Price: 4039, MRP: 8999},
-		{Title: "French Spoken Course", Category: "Language", Duration: "291m", Price: 2859, MRP: 3999},
+		{Title: "Basic English Language Course", Category: "English", Duration: "941m", Price: 2859, MRP: 3999, Image: "basic.jpg"},
+		{Title: "Advance English Course", Category: "English", Duration: "472m", Price: 3449, MRP: 4499, Image: "advance.jpg"},
+		{Title: "A1-A2 English Course", Category: "English", Duration: "500m", Price: 2999, MRP: 3599, Image: "a1a2.jpg"},
+		{Title: "B1-B2 English Course", Category: "English", Duration: "500m", Price: 2999, MRP: 3599, Image: "b1b2.jpg"},
+		{Title: "British Accent Course", Category: "Accent", Duration: "241m", Price: 4039, MRP: 8999, Image: "british.jpg"},
+		{Title: "American Accent Spoken Course", Category: "Accent", Duration: "332m", Price: 4039, MRP: 6999, Image: "american.jpg"},
+		{Title: "French Spoken Course", Category: "Languages", Duration: "291m", Price: 2859, MRP: 3999, Image: "french.jpg"},
+		{Title: "Spanish Full Course", Category: "Languages", Duration: "209m", Price: 2559, MRP: 3999, Image: "spanish.jpg"},
+		{Title: "Japanese Language Course", Category: "Languages", Duration: "329m", Price: 2859, MRP: 3999, Image: "japanese.jpg"},
+		{Title: "IELTS Full Course", Category: "Career", Duration: "335m", Price: 4039, MRP: 8999, Image: "ielts.jpg"},
+		{Title: "Interview Classes - Hindi", Category: "Career", Duration: "188m", Price: 3539, MRP: 4999, Image: "interview_hindi.jpg"},
+		{Title: "Interview Classes - English", Category: "Career", Duration: "189m", Price: 3539, MRP: 4999},
 	} {
 		c.ID = fmt.Sprint("c", i+1)
+		if c.Image != "" {
+			c.Image = "/static/" + c.Image
+		}
 		c.OfferLabel = "Limited Offer"
 		c.OfferEnds = time.Now().Add(72 * time.Hour).Format(time.RFC3339)
 		db.Courses = append(db.Courses, c)
 		db.Quizzes[c.ID] = []Q{{"Which is a greeting?", []string{"Hello", "Table", "Run"}, 0}, {"Past of 'go'?", []string{"goed", "went", "gone"}, 1}, {"Plural of 'child'?", []string{"childs", "children", "childes"}, 1}}
 	}
-	db.Combos = []Combo{{"b1", "Spoken English + Accent Training", []string{"c1", "c3"}, 29999, 17999}}
+	db.Combos = []Combo{{"b1", "Spoken English + Accent Training", []string{"c1", "c5"}, 29999, 17999}}
 	db.Groups = []Group{{"g1", "Janhavi Community", "admin"}}
 }
 
@@ -446,6 +458,7 @@ func main() {
 		jw(w, "ok")
 	})
 	m.HandleFunc("GET /api/admin/orders", guard(true, func(w http.ResponseWriter, r *http.Request, _ *User) { jw(w, db.Orders) }))
+	m.Handle("GET /static/", http.FileServer(http.FS(staticFS)))
 	m.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(adminHTML)

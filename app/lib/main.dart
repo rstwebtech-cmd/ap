@@ -6,8 +6,8 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 const base = String.fromEnvironment('API', defaultValue: 'http://10.0.2.2:8080');
-const photo = 'https://janhavipanwar.com/frontend/jp-about/assets/uploads/img_d8724e3aa2.jpg';
-const logo = 'https://janhavipanwar.com/frontend/jp-about/assets/uploads/img_238145b020.png';
+const photo = '$base/static/janhavi.png';
+const logo = '$base/static/logo.png';
 String token = '';
 Future buy(BuildContext c, String id) async {
   final r = await api('POST', '/api/pay/order', {'itemId': id});
@@ -24,7 +24,7 @@ Future api(String m, String p, [Map? b]) async {
 
 void main() => runApp(MaterialApp(
     debugShowCheckedModeBanner: false,
-    theme: ThemeData(colorSchemeSeed: const Color(0xFF1D4ED8), scaffoldBackgroundColor: const Color(0xFFEEF2FF), useMaterial3: true),
+    theme: ThemeData(colorSchemeSeed: const Color(0xFF6D28D9), scaffoldBackgroundColor: const Color(0xFFF5F3FF), useMaterial3: true),
     home: const Login()));
 
 void go(BuildContext c, Widget w) => Navigator.push(c, MaterialPageRoute(builder: (_) => w));
@@ -41,9 +41,9 @@ class _L extends State<Login> {
   }
   @override Widget build(BuildContext c) => Scaffold(
         body: Container(
-          decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)], begin: Alignment.topCenter, end: Alignment.bottomCenter)),
+          decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF2E1065), Color(0xFF7C3AED)], begin: Alignment.topCenter, end: Alignment.bottomCenter)),
           child: Center(child: Card(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)), margin: const EdgeInsets.all(24), child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
-            CircleAvatar(radius: 50, backgroundImage: const NetworkImage(photo), onBackgroundImageError: (_, __) {}), const SizedBox(height: 8),
+            CircleAvatar(radius: 50, backgroundColor: const Color(0xFFEDE9FE), backgroundImage: const NetworkImage(photo), onBackgroundImageError: (_, __) {}), const SizedBox(height: 8),
             const Text('Janhavi Panwar', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
             const Text('Wonder Girl of India'), const SizedBox(height: 16),
             TextField(controller: nm, decoration: const InputDecoration(labelText: 'Name')),
@@ -67,15 +67,15 @@ class Home extends StatefulWidget { const Home({super.key}); @override State<Hom
 class _H extends State<Home> {
   int i = 0;
   @override Widget build(BuildContext c) {
-    final tabs = [HomeTab((v) => setState(() => i = v)), const Courses(), const LiveTab(), const QuizTab(), const Profile()];
+    void jump(int v) => setState(() => i = v);
+    final tabs = [HomeTab(jump), const Courses(), const QuizTab(), const Community(), Profile(jump)];
     return Scaffold(
-      appBar: i == 0 ? AppBar(backgroundColor: Colors.transparent, title: Image.network(logo, height: 36, errorBuilder: (_, __, ___) => const Text('Janhavi Panwar LMS')), actions: [IconButton(icon: const Icon(Icons.support_agent), onPressed: () => go(c, const Chat(room: 'support', title: 'Live Support')))]) : null,
-      body: SafeArea(child: tabs[i]),
-      bottomNavigationBar: NavigationBar(selectedIndex: i, onDestinationSelected: (v) => setState(() => i = v), destinations: const [
+      body: SafeArea(top: i != 0, child: tabs[i]),
+      bottomNavigationBar: NavigationBar(selectedIndex: i, onDestinationSelected: jump, destinations: const [
         NavigationDestination(icon: Icon(Icons.home), label: 'Home'),
-        NavigationDestination(icon: Icon(Icons.menu_book), label: 'Courses'),
-        NavigationDestination(icon: Icon(Icons.videocam), label: 'Live'),
+        NavigationDestination(icon: Icon(Icons.play_circle), label: 'Courses'),
         NavigationDestination(icon: Icon(Icons.emoji_events), label: 'Quiz'),
+        NavigationDestination(icon: Icon(Icons.groups), label: 'Community'),
         NavigationDestination(icon: Icon(Icons.person), label: 'Profile'),
       ]));
   }
@@ -88,24 +88,32 @@ class _P extends State<Pulse> with SingleTickerProviderStateMixin {
   @override void dispose() { a.dispose(); super.dispose(); }
   @override Widget build(BuildContext c) => ScaleTransition(scale: Tween(begin: 0.92, end: 1.08).animate(a), child: widget.child);
 }
-Widget priceRow(num p, num mrp) => Row(children: [
+Widget cimg(Map k, double h) => ClipRRect(borderRadius: BorderRadius.circular(14), child: (k['Image'] ?? '').toString().isEmpty ? Container(height: h, width: double.infinity, color: const Color(0xFFDDD6FE), child: const Icon(Icons.menu_book, size: 36, color: Color(0xFF6D28D9))) : Image.network(base + k['Image'], height: h, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(height: h, color: const Color(0xFFDDD6FE))));
+Widget priceRow(num p, num mrp) => Wrap(crossAxisAlignment: WrapCrossAlignment.center, spacing: 4, children: [
       Text('₹$p', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.green)), const SizedBox(width: 8),
       Text('₹$mrp', style: const TextStyle(decoration: TextDecoration.lineThrough, color: Colors.grey)), const SizedBox(width: 8),
       Pulse(Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)),
           child: Text('${((mrp - p) * 100 / mrp).round()}% OFF', style: const TextStyle(color: Colors.white, fontSize: 12)))),
     ]);
 
-class Courses extends StatelessWidget {
-  const Courses({super.key});
+Widget courseCard(BuildContext c, Map k) => InkWell(onTap: () => go(c, CourseScreen(k)), child: Card(clipBehavior: Clip.antiAlias, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Stack(children: [cimg(k, 96), Positioned(top: 6, right: 6, child: Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: _blue, borderRadius: BorderRadius.circular(10)), child: Text(k['Category'], style: const TextStyle(color: Colors.white, fontSize: 11)))), const Positioned(bottom: 6, left: 6, child: CircleAvatar(radius: 14, backgroundColor: Colors.black54, child: Icon(Icons.play_arrow, color: Colors.white, size: 18)))]),
+      Padding(padding: const EdgeInsets.all(8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(k['Title'], maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+        Row(children: [const Icon(Icons.access_time, size: 13), Text(' ${k['Duration']}', style: const TextStyle(fontSize: 12))]),
+        priceRow(k['Price'], k['MRP']),
+        SizedBox(width: double.infinity, child: FilledButton(style: FilledButton.styleFrom(backgroundColor: _blue), onPressed: () => go(c, CourseScreen(k)), child: const Text('Enroll Now')))]))])));
+
+class Courses extends StatefulWidget { final String q; const Courses({super.key, this.q = ''}); @override State<Courses> createState() => _Cs(); }
+class _Cs extends State<Courses> {
+  String cat = 'All';
+  static const cats = ['All', 'English', 'Accent', 'Languages', 'Career'];
   @override Widget build(BuildContext c) => FutureBuilder(future: api('GET', '/api/courses'), builder: (_, s) {
         if (!s.hasData) return const Center(child: CircularProgressIndicator());
-        final l = s.data as List;
-        return ListView.builder(itemCount: l.length, itemBuilder: (_, i) => TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0, end: 1), duration: Duration(milliseconds: 300 + i * 120),
-            builder: (_, v, ch) => Opacity(opacity: v, child: Transform.translate(offset: Offset(0, 30 * (1 - v)), child: ch)),
-            child: Card(margin: const EdgeInsets.all(10), child: ListTile(
-              title: Text(l[i]['Title']), subtitle: priceRow(l[i]['Price'], l[i]['MRP']),
-              trailing: const Icon(Icons.chevron_right), onTap: () => go(c, CourseScreen(l[i]))))));
+        final l = (s.data as List).where((x) => (cat == 'All' || x['Category'] == cat) && x['Title'].toString().toLowerCase().contains(widget.q.toLowerCase())).toList();
+        return Column(children: [
+          SizedBox(height: 56, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(8), children: [for (final t in cats) Padding(padding: const EdgeInsets.only(right: 8), child: ChoiceChip(label: Text(t), selected: cat == t, onSelected: (_) => setState(() => cat = t)))])),
+          Expanded(child: GridView.count(crossAxisCount: 2, childAspectRatio: .62, crossAxisSpacing: 10, mainAxisSpacing: 10, padding: const EdgeInsets.all(10), children: [for (final k in l) courseCard(c, k)]))]);
       });
 }
 
@@ -115,7 +123,7 @@ class _C extends State<CourseScreen> {
   @override Widget build(BuildContext c) {
     final k = widget.k;
     return Scaffold(appBar: AppBar(title: Text(k['Title'])), body: ListView(padding: const EdgeInsets.all(16), children: [
-      Text('${k['Category']} · ${k['Duration']}'), priceRow(k['Price'], k['MRP']), const SizedBox(height: 12),
+      cimg(k, 190), const SizedBox(height: 10), Text('${k['Category']} · ${k['Duration']}'), priceRow(k['Price'], k['MRP']), const SizedBox(height: 12),
       FilledButton(onPressed: () => buy(c, k['ID']), child: Text('Buy Now ₹${k['Price']}')),
       OutlinedButton(onPressed: () => go(c, Quiz(k)), child: const Text('Take Final Quiz → Get Certificate')),
       const Divider(), const Text('Reviews', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -173,39 +181,63 @@ class _Q extends State<Quiz> {
       ]));
 }
 
-const _blue = Color(0xFF1D4ED8);
+const _blue = Color(0xFF6D28D9);
+const _dark = Color(0xFF2E1065);
+const _gold = Color(0xFFFBBF24);
+
 class HomeTab extends StatelessWidget {
   final void Function(int) jump;
   const HomeTab(this.jump, {super.key});
-  Widget tile(IconData i, String t, String s, Color col) => Expanded(child: Container(margin: const EdgeInsets.all(4), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: col.withOpacity(.12), borderRadius: BorderRadius.circular(16)), child: Column(children: [Icon(i, color: col), Text(t, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), Text(s, style: const TextStyle(fontSize: 12))])));
-  Widget big(String t, String s, IconData i, Color col, VoidCallback f) => Expanded(child: InkWell(onTap: f, child: Container(margin: const EdgeInsets.all(4), padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: col, borderRadius: BorderRadius.circular(16)), child: Row(children: [Icon(i, color: Colors.white, size: 32), const SizedBox(width: 8), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(t, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)), Text(s, style: const TextStyle(color: Colors.white70, fontSize: 12))]))]))));
-  Widget head(String t) => Padding(padding: const EdgeInsets.fromLTRB(14, 16, 14, 6), child: Text(t, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)));
-  Widget quick(IconData i, String t, VoidCallback f) => Expanded(child: InkWell(onTap: f, child: Container(margin: const EdgeInsets.all(4), padding: const EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14)), child: Column(children: [Icon(i, color: _blue), Text(t, style: const TextStyle(fontSize: 11), textAlign: TextAlign.center)]))));
-  @override Widget build(BuildContext c) => FutureBuilder(future: Future.wait([api('GET', '/api/me'), api('GET', '/api/courses'), api('GET', '/api/live')]), builder: (_, s) {
+  Widget head(String t, [VoidCallback? f]) => Padding(padding: const EdgeInsets.fromLTRB(16, 18, 16, 8), child: Row(children: [Container(width: 4, height: 22, color: _blue), const SizedBox(width: 8), Expanded(child: Text(t, style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold))), if (f != null) TextButton(onPressed: f, child: const Text('View All →'))]));
+  Widget ico(IconData i, String t, Color col, VoidCallback f) => InkWell(onTap: f, child: Container(width: 76, margin: const EdgeInsets.all(4), padding: const EdgeInsets.symmetric(vertical: 10), decoration: BoxDecoration(color: col.withOpacity(.12), borderRadius: BorderRadius.circular(16)), child: Column(children: [Icon(i, color: col, size: 28), const SizedBox(height: 4), Text(t, style: const TextStyle(fontSize: 11), textAlign: TextAlign.center)])));
+  Widget qc(IconData i, String t, String s, Color col, VoidCallback f) => Expanded(child: InkWell(onTap: f, child: Container(margin: const EdgeInsets.all(4), padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4), decoration: BoxDecoration(color: col.withOpacity(.12), borderRadius: BorderRadius.circular(16)), child: Column(children: [Icon(i, color: col), Text(t, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12), textAlign: TextAlign.center), Text(s, style: const TextStyle(fontSize: 10), textAlign: TextAlign.center)]))));
+  @override Widget build(BuildContext c) => FutureBuilder(future: Future.wait([api('GET', '/api/me'), api('GET', '/api/courses'), api('GET', '/api/live'), api('GET', '/api/reviews')]), builder: (_, s) {
         if (!s.hasData) return const Center(child: CircularProgressIndicator());
-        final d = s.data as List; final u = d[0]['user']; final ids = (u['Courses'] as List? ?? []);
-        final mine = (d[1] as List).where((x) => ids.contains(x['ID'])).toList(); final live = (d[2] as List? ?? []);
+        final d = s.data as List; final u = d[0]['user']; final courses = d[1] as List; final live = (d[2] as List? ?? []); final revs = (d[3] as List? ?? []);
         final nm = (u['Name'] ?? '').toString().isEmpty ? 'Student' : u['Name'];
-        return ListView(children: [
-          Container(margin: const EdgeInsets.all(12), height: 150, decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFFC7D2FE), Color(0xFF93C5FD)]), borderRadius: BorderRadius.circular(24)), child: Row(children: [
-            Expanded(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.center, children: [Text('Hello, $nm! 👋', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A))), const Text("Let's learn something new today!")]))),
-            ClipRRect(borderRadius: const BorderRadius.horizontal(right: Radius.circular(24)), child: Image.network(photo, width: 120, height: 150, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox(width: 120)))])),
-          Row(children: [tile(Icons.school, '${mine.length}', 'Courses Enrolled', Colors.green), tile(Icons.workspace_premium, '${(d[0]['certs'] as List? ?? []).length}', 'Certificates', Colors.orange), tile(Icons.videocam, '${live.length}', 'Live Classes', _blue)]),
-          Row(children: [big('Live Classes', 'Join Now →', Icons.play_circle, _blue, () => jump(2)), big('Daily Quiz', 'Test Your Knowledge', Icons.quiz, Colors.purple, () => jump(3))]),
-          head('My Learning'),
-          if (mine.isEmpty) const Padding(padding: EdgeInsets.all(14), child: Text('Abhi koi course nahi liya. Courses tab se shuru karo!')),
-          for (final k in mine) Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: ListTile(leading: const Icon(Icons.menu_book, color: _blue), title: Text(k['Title']), subtitle: Text('${k['Category']} · ${k['Duration']}'), trailing: const Icon(Icons.play_circle, color: _blue), onTap: () => go(c, CourseScreen(k)))),
-          head('Upcoming Classes'),
-          if (live.isEmpty) const Padding(padding: EdgeInsets.all(14), child: Text('Koi live class scheduled nahi.')),
-          for (final l in live.take(2)) Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: ListTile(leading: const Icon(Icons.videocam, color: _blue), title: Text(l['Title']), subtitle: Text(l['At']), trailing: FilledButton(onPressed: () => launchUrl(Uri.parse(l['Link']), mode: LaunchMode.externalApplication), child: const Text('Join Now')))),
-          head('Quick Access'),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: Row(children: [
-            quick(Icons.local_offer, 'Combo Offers', () => page(c, 'Combo Offers', const Combos())),
-            quick(Icons.groups, 'Community', () => page(c, 'Community', const Community())),
-            quick(Icons.workspace_premium, 'Certificates', () => jump(4)),
-            quick(Icons.headset_mic, 'Help & Support', () => go(c, const Chat(room: 'support', title: 'Live Support')))])),
-          const SizedBox(height: 20)]);
+        return ListView(padding: EdgeInsets.zero, children: [
+          Container(height: 270, decoration: const BoxDecoration(gradient: LinearGradient(colors: [_dark, Color(0xFF7C3AED)], begin: Alignment.topLeft, end: Alignment.bottomRight), borderRadius: BorderRadius.vertical(bottom: Radius.circular(28))), child: Stack(children: [
+            Positioned(right: 0, bottom: 0, child: Image.network(photo, height: 240, fit: BoxFit.contain, errorBuilder: (_, __, ___) => const SizedBox())),
+            SafeArea(child: Padding(padding: const EdgeInsets.fromLTRB(16, 8, 140, 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Image.network(logo, height: 34, errorBuilder: (_, __, ___) => const Text('Janhavi Panwar', style: TextStyle(color: Colors.white, fontSize: 20))),
+              const Spacer(),
+              const Text('Dream Big...', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+              const Text('Learn Beyond Limits!', style: TextStyle(color: _gold, fontSize: 22, fontWeight: FontWeight.bold)),
+              Text('Hello, $nm 👋', style: const TextStyle(color: Colors.white70)), const SizedBox(height: 8),
+              FilledButton(style: FilledButton.styleFrom(backgroundColor: _gold, foregroundColor: Colors.black), onPressed: () => jump(1), child: const Text('Explore Courses →'))])))])),
+          Padding(padding: const EdgeInsets.all(14), child: TextField(decoration: InputDecoration(hintText: 'Search courses, quizzes, or topics...', prefixIcon: const Icon(Icons.search), filled: true, fillColor: Colors.white, border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none)), onSubmitted: (v) => page(c, 'Search: $v', Courses(q: v)))),
+          SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 8), child: Row(children: [
+            ico(Icons.school, 'Courses', _blue, () => jump(1)), ico(Icons.star, 'Reviews', Colors.orange, () => page(c, 'Reviews', const ReviewsPage())),
+            ico(Icons.chat, 'Live Chat', Colors.teal, () => go(c, const Chat(room: 'support', title: 'Live Support'))), ico(Icons.groups, 'Community', Colors.purple, () => jump(3)),
+            ico(Icons.quiz, 'Quiz', Colors.indigo, () => jump(2)), ico(Icons.bar_chart, 'Level Check', Colors.green, () => jump(4))])),
+          head('Featured Courses', () => jump(1)),
+          GridView.count(crossAxisCount: 2, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), childAspectRatio: .62, crossAxisSpacing: 10, mainAxisSpacing: 10, padding: const EdgeInsets.symmetric(horizontal: 12), children: [for (final k in courses.take(4)) courseCard(c, k)]),
+          Container(margin: const EdgeInsets.fromLTRB(14, 18, 14, 4), padding: const EdgeInsets.all(18), decoration: BoxDecoration(gradient: const LinearGradient(colors: [_dark, Color(0xFF7C3AED)]), borderRadius: BorderRadius.circular(22)), child: Row(children: [
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(8)), child: Text(live.isEmpty ? 'Coming Soon' : 'Live', style: const TextStyle(color: Colors.white, fontSize: 12))),
+              Text(live.isEmpty ? 'Live Classes' : live[0]['Title'], style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              Text(live.isEmpty ? 'Jald hi schedule hogi' : live[0]['At'], style: const TextStyle(color: Colors.white70)), const SizedBox(height: 8),
+              FilledButton(style: FilledButton.styleFrom(backgroundColor: Colors.white, foregroundColor: _blue), onPressed: () => live.isEmpty ? page(c, 'Live Classes', const LiveTab()) : launchUrl(Uri.parse(live[0]['Link']), mode: LaunchMode.externalApplication), child: const Text('Join Live →'))])),
+            const Icon(Icons.podcasts, color: _gold, size: 60)])),
+          Padding(padding: const EdgeInsets.fromLTRB(10, 12, 10, 0), child: Row(children: [
+            qc(Icons.local_offer, 'Combo Offers', 'Save more', Colors.deepOrange, () => page(c, 'Combo Offers', const Combos())), qc(Icons.trending_up, 'Your Progress', 'Track Level', Colors.orange, () => jump(4)),
+            qc(Icons.workspace_premium, 'Certificates', 'Get Certified', Colors.amber, () => jump(4)), qc(Icons.quiz, 'Take Quiz', 'Test Skills', Colors.indigo, () => jump(2))])),
+          head('What Our Learners Say', () => page(c, 'Reviews', const ReviewsPage())),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 14), child: Row(children: [
+            Expanded(flex: 2, child: Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16)), child: revs.isEmpty ? const Text('Pehle review aap likho! ⭐') : Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('⭐' * (revs[0]['Stars'] as int)), Text('"${revs[0]['Text']}"', maxLines: 3, overflow: TextOverflow.ellipsis), Text('— ${revs[0]['Name']}', style: const TextStyle(fontSize: 12, color: Colors.grey))]))),
+            const SizedBox(width: 10),
+            Expanded(child: Container(padding: const EdgeInsets.all(14), decoration: BoxDecoration(color: const Color(0xFFEDE9FE), borderRadius: BorderRadius.circular(16)), child: const Column(children: [Icon(Icons.groups, color: _blue), Text('2.27M+', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), Text('YouTube Family', style: TextStyle(fontSize: 11), textAlign: TextAlign.center)])))])),
+          const SizedBox(height: 24)]);
       });
+}
+
+class ReviewsPage extends StatefulWidget { const ReviewsPage({super.key}); @override State<ReviewsPage> createState() => _Rv(); }
+class _Rv extends State<ReviewsPage> {
+  final t = TextEditingController();
+  @override Widget build(BuildContext c) => FutureBuilder(future: api('GET', '/api/reviews'), builder: (_, s) => ListView(padding: const EdgeInsets.all(12), children: [
+        TextField(controller: t, decoration: const InputDecoration(labelText: 'Apna review likho (approval ke baad dikhega)')),
+        TextButton(onPressed: () async { await api('POST', '/api/reviews', {'text': t.text, 'stars': 5}); t.clear(); snack(c, 'Thanks! Review pending approval'); }, child: const Text('Submit review')),
+        for (final r in (s.data as List? ?? [])) Card(child: ListTile(title: Text(r['Name']), subtitle: Text(r['Text']), trailing: Text('⭐${r['Stars']}')))]));
 }
 
 class LiveTab extends StatelessWidget {
@@ -223,26 +255,45 @@ class QuizTab extends StatelessWidget {
   @override Widget build(BuildContext c) => FutureBuilder(future: api('GET', '/api/courses'), builder: (_, s) {
         if (!s.hasData) return const Center(child: CircularProgressIndicator());
         return ListView(children: [const Padding(padding: EdgeInsets.all(14), child: Text('Quiz do aur certificate pao 🏆', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold))),
-          for (final k in s.data as List) Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: ListTile(leading: const Icon(Icons.quiz, color: Colors.purple), title: Text(k['Title']), trailing: const Icon(Icons.chevron_right), onTap: () => go(c, Quiz(k))))]);
+          for (final k in s.data as List) Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: ListTile(leading: SizedBox(width: 80, child: cimg(k, 50)), title: Text(k['Title']), trailing: const Icon(Icons.chevron_right), onTap: () => go(c, Quiz(k))))]);
       });
 }
 
 class Profile extends StatelessWidget {
-  const Profile({super.key});
+  final void Function(int) jump;
+  const Profile(this.jump, {super.key});
   @override Widget build(BuildContext c) => FutureBuilder(future: api('GET', '/api/me'), builder: (_, s) {
         if (!s.hasData) return const Center(child: CircularProgressIndicator());
         final d = s.data as Map; final u = d['user']; final certs = (d['certs'] as List? ?? []);
         final nm = (u['Name'] ?? '').toString(); final ini = nm.isEmpty ? 'S' : nm[0].toUpperCase();
-        Widget item(IconData i, String t, VoidCallback f, [Color? col]) => Card(margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), child: ListTile(leading: Icon(i, color: col ?? _blue), title: Text(t, style: TextStyle(color: col)), trailing: const Icon(Icons.chevron_right), onTap: f));
-        return ListView(children: [
-          Container(padding: const EdgeInsets.all(24), decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF1E3A8A), Color(0xFF3B82F6)]), borderRadius: BorderRadius.vertical(bottom: Radius.circular(32))), child: Column(children: [
-            CircleAvatar(radius: 46, backgroundColor: Colors.white, child: Text(ini, style: const TextStyle(fontSize: 36, color: _blue))), const SizedBox(height: 8),
-            Text(nm.isEmpty ? 'Student' : nm, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
-            Text('${u['Email'] ?? ''} ${u['Phone'] ?? ''}', style: const TextStyle(color: Colors.white70))])),
-          const SizedBox(height: 12),
-          item(Icons.workspace_premium, 'My Certificates (${certs.length})', () => page(c, 'My Certificates', ListView(children: [for (final x in certs) ListTile(leading: const Icon(Icons.workspace_premium, color: Colors.orange), title: Text(x['CourseTitle']), subtitle: Text(x['Date']), onTap: () => launchUrl(Uri.parse('$base/certificate/${x['ID']}'), mode: LaunchMode.externalApplication))]))),
-          item(Icons.groups, 'Community', () => page(c, 'Community', const Community())),
-          item(Icons.headset_mic, 'Help & Support', () => go(c, const Chat(room: 'support', title: 'Live Support'))),
-          item(Icons.logout, 'Logout', () { token = ''; Navigator.pushAndRemoveUntil(c, MaterialPageRoute(builder: (_) => const Login()), (_) => false); }, Colors.red)]);
+        final enr = ((u['Courses'] as List? ?? [])).toSet().length;
+        final pts = enr * 100 + certs.length * 500; final lvl = 1 + pts ~/ 500; final pct = (pts % 500) / 500;
+        final lname = lvl < 3 ? 'Beginner' : lvl < 5 ? 'Intermediate' : 'Advanced Learner';
+        Widget stat(IconData i, String v, String t) => Expanded(child: Column(children: [Icon(i, color: _blue), Text(v, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), Text(t, style: const TextStyle(fontSize: 11), textAlign: TextAlign.center)]));
+        Widget item(IconData i, String t, String sub, VoidCallback f, [Color? col]) => Container(margin: const EdgeInsets.symmetric(horizontal: 14, vertical: 4), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFDDD6FE))), child: ListTile(leading: Icon(i, color: col ?? _blue, size: 30), title: Text(t, style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(sub), trailing: Icon(Icons.chevron_right, color: col ?? _blue), onTap: f));
+        Widget badge(IconData i, String t, bool on) => Expanded(child: Container(margin: const EdgeInsets.all(3), padding: const EdgeInsets.symmetric(vertical: 10), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)), child: Column(children: [Icon(i, size: 30, color: on ? _gold : Colors.grey.shade400), Text(t, style: const TextStyle(fontSize: 10), textAlign: TextAlign.center)])));
+        return ListView(padding: EdgeInsets.zero, children: [
+          Container(padding: const EdgeInsets.fromLTRB(16, 40, 16, 40), decoration: const BoxDecoration(gradient: LinearGradient(colors: [_dark, Color(0xFF7C3AED)]), borderRadius: BorderRadius.vertical(bottom: Radius.circular(32))), child: Row(children: [
+            CircleAvatar(radius: 46, backgroundColor: _gold, child: CircleAvatar(radius: 42, backgroundColor: Colors.white, child: Text(ini, style: const TextStyle(fontSize: 36, color: _blue)))), const SizedBox(width: 14),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(nm.isEmpty ? 'Student' : nm, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
+              Text('${u['Email'] ?? ''}${u['Phone'] ?? ''}', style: const TextStyle(color: Colors.white70)), const SizedBox(height: 6),
+              Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4), decoration: BoxDecoration(color: _blue, borderRadius: BorderRadius.circular(20), border: Border.all(color: _gold)), child: Text(enr > 0 ? '💎 Premium Member' : 'Free Member', style: const TextStyle(color: Colors.white, fontSize: 12)))]))])),
+          Container(margin: const EdgeInsets.all(14), padding: const EdgeInsets.symmetric(vertical: 14), decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(18)), child: Row(children: [stat(Icons.play_circle, '$enr', 'Courses Enrolled'), stat(Icons.military_tech, '$lvl', 'Level'), stat(Icons.star, '$pts', 'Points'), stat(Icons.workspace_premium, '${certs.length}', 'Certificates')])),
+          Container(margin: const EdgeInsets.symmetric(horizontal: 14), padding: const EdgeInsets.all(16), decoration: BoxDecoration(gradient: const LinearGradient(colors: [_dark, Color(0xFF7C3AED)]), borderRadius: BorderRadius.circular(20)), child: Row(children: [
+            SizedBox(width: 90, height: 90, child: Stack(alignment: Alignment.center, children: [SizedBox(width: 90, height: 90, child: CircularProgressIndicator(value: pct == 0 ? 0.02 : pct, strokeWidth: 9, color: _gold, backgroundColor: Colors.white24)), Text('${(pct * 100).round()}%', style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold))])), const SizedBox(width: 16),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Your Learning Progress', style: TextStyle(color: Colors.white70, fontSize: 12)), Text('👑 Level $lvl', style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)), Text(lname, style: const TextStyle(color: Colors.white70)), const SizedBox(height: 6), LinearProgressIndicator(value: pct, color: _gold, backgroundColor: Colors.white24), const SizedBox(height: 4), Text('⭐ $pts Points', style: const TextStyle(color: Colors.white))])),
+            const Icon(Icons.emoji_events, color: _gold, size: 54)])),
+          const SizedBox(height: 10),
+          item(Icons.play_circle, 'My Courses', 'Continue your learning journey', () => jump(1)),
+          item(Icons.quiz, 'My Quizzes', 'Check your quiz performance', () => jump(2)),
+          item(Icons.workspace_premium, 'My Certificates', 'Download your certificates', () => page(c, 'My Certificates', ListView(children: [for (final x in certs) ListTile(leading: const Icon(Icons.workspace_premium, color: _gold), title: Text(x['CourseTitle']), subtitle: Text(x['Date']), onTap: () => launchUrl(Uri.parse('$base/certificate/${x['ID']}'), mode: LaunchMode.externalApplication))]))),
+          item(Icons.star, 'My Reviews', 'Share your feedback', () => page(c, 'Reviews', const ReviewsPage())),
+          item(Icons.groups, 'My Community', 'Connect with learners', () => jump(3)),
+          item(Icons.chat, 'Live Chat', 'Chat with our support team', () => go(c, const Chat(room: 'support', title: 'Live Support'))),
+          item(Icons.logout, 'Logout', 'Sign out from your account', () { token = ''; Navigator.pushAndRemoveUntil(c, MaterialPageRoute(builder: (_) => const Login()), (_) => false); }, Colors.red),
+          Container(margin: const EdgeInsets.all(14), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFEDE9FE), borderRadius: BorderRadius.circular(18)), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('⭐ Your Achievements', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)), const SizedBox(height: 8),
+            Row(children: [badge(Icons.school, 'First Course', enr >= 1), badge(Icons.verified, 'Quiz Master', certs.isNotEmpty), badge(Icons.emoji_events, 'Course Champion', certs.length >= 3), badge(Icons.military_tech, 'Level 3+', lvl >= 3)])]))]);
       });
 }
