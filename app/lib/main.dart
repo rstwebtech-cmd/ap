@@ -3,9 +3,17 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const base = String.fromEnvironment('API', defaultValue: 'http://10.0.2.2:8080');
+const photo = 'https://janhavipanwar.com/frontend/jp-about/assets/uploads/img_d8724e3aa2.jpg';
+const logo = 'https://janhavipanwar.com/frontend/jp-about/assets/uploads/img_238145b020.png';
 String token = '';
+Future buy(BuildContext c, String id) async {
+  final r = await api('POST', '/api/pay/order', {'itemId': id});
+  if (r['url'] == null) return snack(c, r['error'] ?? 'Payment error');
+  await launchUrl(Uri.parse(r['url']), mode: LaunchMode.externalApplication);
+}
 Map me = {};
 Future api(String m, String p, [Map? b]) async {
   final h = {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'};
@@ -35,7 +43,8 @@ class _L extends State<Login> {
         body: Container(
           decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFF4A148C), Color(0xFFAB47BC)], begin: Alignment.topCenter, end: Alignment.bottomCenter)),
           child: Center(child: Card(margin: const EdgeInsets.all(24), child: Padding(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [
-            const Text('👑 Janhavi Panwar', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+            CircleAvatar(radius: 50, backgroundImage: const NetworkImage(photo), onBackgroundImageError: (_, __) {}), const SizedBox(height: 8),
+            const Text('Janhavi Panwar', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
             const Text('Wonder Girl of India'), const SizedBox(height: 16),
             TextField(controller: nm, decoration: const InputDecoration(labelText: 'Name')),
             TextField(controller: ph, keyboardType: TextInputType.phone, decoration: const InputDecoration(labelText: 'Mobile (+91...)')),
@@ -60,7 +69,7 @@ class _H extends State<Home> {
   @override Widget build(BuildContext c) {
     final tabs = [const Courses(), const Combos(), const Community(), const Profile()];
     return Scaffold(
-      appBar: AppBar(title: const Text('Janhavi Panwar'), actions: [IconButton(icon: const Icon(Icons.support_agent), tooltip: 'Live chat', onPressed: () => go(c, const Chat(room: 'support', title: 'Live Support')))]),
+      appBar: AppBar(title: Image.network(logo, height: 36, errorBuilder: (_, __, ___) => const Text('Janhavi Panwar')), actions: [IconButton(icon: const Icon(Icons.support_agent), tooltip: 'Live chat', onPressed: () => go(c, const Chat(room: 'support', title: 'Live Support')))]),
       body: tabs[i],
       bottomNavigationBar: NavigationBar(selectedIndex: i, onDestinationSelected: (v) => setState(() => i = v), destinations: const [
         NavigationDestination(icon: Icon(Icons.school), label: 'Courses'),
@@ -105,8 +114,7 @@ class _C extends State<CourseScreen> {
     final k = widget.k;
     return Scaffold(appBar: AppBar(title: Text(k['Title'])), body: ListView(padding: const EdgeInsets.all(16), children: [
       Text('${k['Category']} · ${k['Duration']}'), priceRow(k['Price'], k['MRP']), const SizedBox(height: 12),
-      FilledButton(onPressed: () async { // TODO: Razorpay payment first
-        await api('POST', '/api/enroll', {'courseId': k['ID']}); snack(c, 'Enrolled!'); }, child: const Text('Buy / Enroll Now')),
+      FilledButton(onPressed: () => buy(c, k['ID']), child: Text('Buy Now ₹${k['Price']}')),
       OutlinedButton(onPressed: () => go(c, Quiz(k)), child: const Text('Take Final Quiz → Get Certificate')),
       const Divider(), const Text('Reviews', style: TextStyle(fontWeight: FontWeight.bold)),
       FutureBuilder(future: api('GET', '/api/reviews'), builder: (_, s) => Column(children: [
@@ -123,7 +131,7 @@ class Combos extends StatelessWidget {
         if (!s.hasData) return const Center(child: CircularProgressIndicator());
         return ListView(children: [for (final b in s.data as List) Card(color: Colors.amber.shade50, margin: const EdgeInsets.all(12), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('🔥 SPECIAL COMBO OFFER'), Text(b['Title'], style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)), priceRow(b['Price'], b['MRP']),
-          FilledButton(onPressed: () async { for (final id in b['Items']) { await api('POST', '/api/enroll', {'courseId': id}); } snack(c, 'Combo enrolled!'); }, child: const Text('Get Offer'))])))]);
+          FilledButton(onPressed: () => buy(c, b['ID']), child: const Text('Get Offer'))])))]);
       });
 }
 

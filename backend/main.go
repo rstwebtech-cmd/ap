@@ -2,6 +2,10 @@ package main
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
+	_ "embed"
+	"strings"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -47,6 +51,11 @@ type Q struct {
 	Options []string
 	Answer  int
 }
+type Order struct {
+	ID, UserID, Item string
+	Amount           int
+	Paid             bool
+}
 type Cert struct{ ID, UserName, CourseTitle, Date string }
 type DB struct {
 	Users    map[string]*User
@@ -57,15 +66,19 @@ type DB struct {
 	Msgs     []Msg
 	Quizzes  map[string][]Q
 	Certs    map[string]Cert
+	Orders   map[string]*Order
 	Settings map[string]string // smtp_host,smtp_port,smtp_user,smtp_pass,wa_url,wa_token
 }
 
 var (
-	db       = &DB{Users: map[string]*User{}, Quizzes: map[string][]Q{}, Certs: map[string]Cert{}, Settings: map[string]string{}}
+	db       = &DB{Users: map[string]*User{}, Quizzes: map[string][]Q{}, Certs: map[string]Cert{}, Orders: map[string]*Order{}, Settings: map[string]string{}}
 	mu       sync.Mutex
 	sessions = map[string]string{}
 	otps     = map[string]string{}
 )
+
+//go:embed admin.html
+var adminHTML []byte
 
 func save() { b, _ := json.MarshalIndent(db, "", " "); os.WriteFile("data.json", b, 0644) }
 func load() {
@@ -194,12 +207,6 @@ func main() {
 	// ---- catalogue ----
 	m.HandleFunc("GET /api/courses", guard(false, func(w http.ResponseWriter, r *http.Request, _ *User) { jw(w, db.Courses) }))
 	m.HandleFunc("GET /api/combos", guard(false, func(w http.ResponseWriter, r *http.Request, _ *User) { jw(w, db.Combos) }))
-	m.HandleFunc("POST /api/enroll", guard(false, func(w http.ResponseWriter, r *http.Request, u *User) {
-		var b struct{ CourseID string } // TODO: verify Razorpay payment before this
-		in(r, &b)
-		u.Courses = append(u.Courses, b.CourseID)
-		jw(w, u)
-	}))
 	m.HandleFunc("GET /api/me", guard(false, func(w http.ResponseWriter, r *http.Request, u *User) {
 		var cs []Cert
 		for _, c := range db.Certs {
@@ -360,6 +367,85 @@ func main() {
 		}
 		jw(w, map[string]int{"queued": n})
 	}))
+	// ---- Razorpay ----
+	m.HandleFunc("POST /api/pay/order", guard(false, func(w http.ResponseWriter, r *http.Request, u *User) {
+		var b struct{ ItemID string }
+		in(r, &b)
+		amt := 0
+		for _, c := range db.Courses {
+			if c.ID == b.ItemID {
+				amt = c.Price
+			}
+		}
+		for _, c := range db.Combos {
+			if c.ID == b.ItemID {
+				amt = c.Price
+			}
+		}
+		st := db.Settings
+		if amt == 0 || st["rz_key_id"] == "" {
+			http.Error(w, `{"error":"payment not configured in admin settings"}`, 400)
+			return
+		}
+		body, _ := json.Marshal(map[string]any{"amount": amt * 100, "currency": "INR", "receipt": rid()})
+		req, _ := http.NewRequest("POST", "https://api.razorpay.com/v1/orders", bytes.NewReader(body))
+		req.SetBasicAuth(st["rz_key_id"], st["rz_key_secret"])
+		req.Header.Set("Content-Type", "application/json")
+		var o struct{ ID string }
+		if resp, err := http.DefaultClient.Do(req); err == nil {
+			json.NewDecoder(resp.Body).Decode(&o)
+		}
+		if o.ID == "" {
+			http.Error(w, `{"error":"razorpay order failed - check keys"}`, 502)
+			return
+		}
+		db.Orders[o.ID] = &Order{o.ID, u.ID, b.ItemID, amt, false}
+		sch := "https"
+		if strings.HasPrefix(r.Host, "localhost") {
+			sch = "http"
+		}
+		jw(w, map[string]string{"url": sch + "://" + r.Host + "/pay/" + o.ID})
+	}))
+	m.HandleFunc("GET /pay/{id}", func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		o, k := db.Orders[r.PathValue("id")], db.Settings["rz_key_id"]
+		mu.Unlock()
+		if o == nil {
+			http.NotFound(w, r)
+			return
+		}
+		fmt.Fprintf(w, `<meta name=viewport content="width=device-width,initial-scale=1"><body style="font-family:sans-serif;text-align:center;padding:40px"><h3>Opening payment...</h3><script src="https://checkout.razorpay.com/v1/checkout.js"></script><script>new Razorpay({key:"%s",order_id:"%s",amount:%d,currency:"INR",name:"Janhavi Panwar",handler:function(r){fetch("/api/pay/verify",{method:"POST",body:JSON.stringify(r)}).then(function(x){document.body.innerHTML=x.ok?"<h2>Payment successful ✅<br>App par wapas jaao</h2>":"<h2>Verification failed</h2>"})}}).open()</script>`, k, o.ID, o.Amount*100)
+	})
+	m.HandleFunc("POST /api/pay/verify", func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		defer mu.Unlock()
+		defer save()
+		var b struct{ Razorpay_order_id, Razorpay_payment_id, Razorpay_signature string }
+		in(r, &b)
+		o := db.Orders[b.Razorpay_order_id]
+		h := hmac.New(sha256.New, []byte(db.Settings["rz_key_secret"]))
+		h.Write([]byte(b.Razorpay_order_id + "|" + b.Razorpay_payment_id))
+		if o == nil || o.Paid || !hmac.Equal([]byte(hex.EncodeToString(h.Sum(nil))), []byte(b.Razorpay_signature)) {
+			http.Error(w, `{"error":"invalid"}`, 400)
+			return
+		}
+		o.Paid = true
+		items := []string{o.Item}
+		for _, c := range db.Combos {
+			if c.ID == o.Item {
+				items = c.Items
+			}
+		}
+		if u := db.Users[o.UserID]; u != nil {
+			u.Courses = append(u.Courses, items...)
+		}
+		jw(w, "ok")
+	})
+	m.HandleFunc("GET /api/admin/orders", guard(true, func(w http.ResponseWriter, r *http.Request, _ *User) { jw(w, db.Orders) }))
+	m.HandleFunc("GET /admin", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.Write(adminHTML)
+	})
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
