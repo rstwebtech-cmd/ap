@@ -9,5 +9,7 @@ dependencies:
   http: ^1.2.0
   google_sign_in: ^6.2.1
   url_launcher: ^6.3.0
+  video_player: ^2.8.6
+  chewie: ^1.8.1
 flutter:
   uses-material-design: true
